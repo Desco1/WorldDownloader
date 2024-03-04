@@ -1,0 +1,16 @@
+{
+    "verbose": true,
+    "minVersion": "0.8.0",
+    "compatibilityLevel": "JAVA_8",
+    "package": "dev.desco.worlddownloader.mixins",
+    "refmap": "worlddownloader.mixins.refmap.json",
+    "mixins": [
+        "AnvilChunkLoaderAccessor",
+        "ChunkProviderClientMixin",
+        "EnumChatFormattingMixin",
+        "NBTBaseAccessor",
+        "WorldInfoMixin",
+        "WorldMixin",
+        "WorldServerMixin"
+    ]
+}
