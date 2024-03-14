@@ -14,6 +14,7 @@ public class WorldInfoMixin implements DownloadedWorld {
     private boolean isDownloaded = false;
     private boolean tickBlocks = true;
     private boolean tickEntities = true;
+
     @Inject(method = "<init>(Lnet/minecraft/nbt/NBTTagCompound;)V", at = @At("RETURN"))
     private void onInit(NBTTagCompound tag, CallbackInfo ci) {
         this.isDownloaded = tag.getBoolean("DownloadedWorld");

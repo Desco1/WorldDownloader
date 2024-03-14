@@ -105,8 +105,8 @@ class WorldDownloader(private val settings: WorldSettings): Downloader {
                 it.setHasEntities(false)
                 val entityList = NBTTagList()
                 if (settings.entities) {
-                    for (index in it.entityLists.indices) {
-                        for (entity in it.entityLists[index]) {
+                    for (list in it.entityLists) {
+                        for (entity in list) {
                             val entityTag = NBTTagCompound()
 
                             if (entity.writeToNBTOptional(entityTag)) {

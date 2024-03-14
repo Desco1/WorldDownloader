@@ -3,7 +3,6 @@ package dev.desco.worlddownloader.core
 import dev.desco.worlddownloader.utils.ChunkProviderCache
 import gg.essential.api.EssentialAPI
 import gg.essential.elementa.ElementaVersion
-import gg.essential.elementa.UIComponent
 import gg.essential.elementa.WindowScreen
 import gg.essential.elementa.components.*
 import gg.essential.elementa.constraints.*
@@ -13,12 +12,16 @@ import gg.essential.elementa.effects.ScissorEffect
 import gg.essential.elementa.state.*
 import gg.essential.elementa.utils.roundToRealPixels
 import gg.essential.elementa.utils.withAlpha
+import gg.essential.universal.UMatrixStack
 import gg.essential.universal.UMouse
 import gg.essential.vigilance.utils.onLeftClick
 import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.Tessellator
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats
 import net.minecraft.util.BlockPos
 import net.minecraft.world.chunk.Chunk
 import net.minecraft.world.chunk.EmptyChunk
+import org.lwjgl.opengl.GL11
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.util.concurrent.CompletableFuture
@@ -29,6 +32,7 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
 
     private val provider = Minecraft.getMinecraft().theWorld.chunkProvider
     val chunks by state(hashSetOf<Chunk>())
+    private var empty by state(true)
 
     private val toolbar = UIBlock(Color.BLACK).constrain {
         this.x = 0.pixels
@@ -190,11 +194,19 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
         this.y = CenterConstraint()
         this.width = AspectConstraint()
         this.height = 80.percent
-        this.color = Color.DARK_GRAY.toConstraint()
     }.apply {
-        this childOf toolbar
+        setColor(map(::empty) {
+            if (it) {
+                Color.DARK_GRAY
+            } else {
+                Color.WHITE
+            }
+        }.state.toConstraint())
+
         onLeftClick {
-            EssentialAPI.getGuiUtil().openScreen(SettingScreen(this@WorldScreen))
+            if (chunks.isNotEmpty()) {
+                EssentialAPI.getGuiUtil().openScreen(SettingScreen(this@WorldScreen))
+            }
         }
         onMouseEnter {
             Window.enqueueRenderOperation {
@@ -210,7 +222,7 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
                 tooltip.hide(true)
             }
         }
-    }
+    } childOf toolbar
 
     private val tooltip = UIBlock(Color.BLACK).constrain {
         this.y = 5.percent + 5.pixels
@@ -246,22 +258,27 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
             dragging = true
             dragStart = it.absoluteX to it.absoluteY
             if (cursor == CursorType.AREA) {
-                val state = (this.hitTest(it.absoluteX, it.absoluteY) as? ChunkComponent)?.selected
-                state?.let {
-                    areaType = state == false
+                val comp = (this.hitTest(it.absoluteX, it.absoluteY) as? ChunkComponent)
+                comp?.let {
+                    areaType = comp.selected == false
+                    dragStart = comp.getLeft() + 8f to comp.getTop() + 8f
                 } ?: run {
-                    dragging = false
-                    dragStart = 0f to 0f
+                    areaType = true
+                    dragStart = (chunkHolder.getLeft() + (it.absoluteX.toInt() - chunkHolder.getLeft()) / 16 * 16f + 8f) to (chunkHolder.getTop() + (it.absoluteY.toInt() - chunkHolder.getTop()) / 16 * 16f + 8f)
                 }
             }
         }.onMouseRelease {
             if (dragging && cursor == CursorType.AREA) {
-                val xRange = min(dragStart.first, UMouse.Scaled.x.toFloat()) .. max(dragStart.first, UMouse.Scaled.x.toFloat())
-                val yRange = min(dragStart.second, UMouse.Scaled.y.toFloat()) .. max(dragStart.second, UMouse.Scaled.y.toFloat())
+                val endX = (chunkHolder.getLeft() + 8f + (UMouse.Scaled.x.toInt() - chunkHolder.getLeft().toInt()) / 16 * 16f)
+                val endY = (chunkHolder.getTop() + 8f + (UMouse.Scaled.y.toInt() - chunkHolder.getTop().toInt()) / 16 * 16f)
+
+                val xRange = min(dragStart.first, endX).. max(dragStart.first, endX)
+                val yRange = min(dragStart.second, endY).. max(dragStart.second, endY)
 
                 for (chunkComponent in chunkHolder.childrenOfType<ChunkComponent>()) {
-                    if ((chunkComponent.getLeft() in xRange || chunkComponent.getRight() in xRange)
-                        && (chunkComponent.getTop() in yRange || chunkComponent.getBottom() in yRange)) {
+                    if ((chunkComponent.getLeft() + 8f in xRange)
+                        && (chunkComponent.getTop() + 8f in yRange)
+                    ) {
                         chunkComponent.selected = areaType
                     }
                 }
@@ -279,7 +296,6 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
             val deltaY = absY - dragStart.second
             dragStart = absX to absY
 
-
             if (deltaX != 0f || deltaY != -1f) { // Do not ask. Elementa is playing dolls with the parameter types
                 val newX = (chunkHolder.getLeft() - this.getLeft() + deltaX)
                     .coerceIn(-chunkHolder.getWidth() + 10f, this.getRight() - 10f)
@@ -288,6 +304,47 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
                 chunkHolder.setX(newX.pixels)
                 chunkHolder.setY(newY.pixels)
             }
+        }
+    }
+
+    override fun onDrawScreen(matrixStack: UMatrixStack, mouseX: Int, mouseY: Int, partialTicks: Float) {
+        super.onDrawScreen(matrixStack, mouseX, mouseY, partialTicks)
+
+        if (dragging && cursor == CursorType.AREA) {
+            val endX = (chunkHolder.getLeft() + 8f + (UMouse.Scaled.x.toInt() - chunkHolder.getLeft().toInt()) / 16 * 16f)
+            val endY = (chunkHolder.getTop() + 8f + (UMouse.Scaled.y.toInt() - chunkHolder.getTop().toInt()) / 16 * 16f)
+
+            val xRange = min(dragStart.first, endX) .. max(dragStart.first, endX)
+            val yRange = min(dragStart.second, endY) .. max(dragStart.second, endY)
+
+            val chunks = chunkHolder.childrenOfType<ChunkComponent>()
+                .filter { (it.getLeft() + 8f in xRange) && (it.getTop() + 8f in yRange) }.toMutableList()
+            if (chunks.isEmpty()) {
+                if (endX == dragStart.first && endY == dragStart.second) {
+                    chunks.add(window.hitTest(endX, endY) as? ChunkComponent ?: return)
+                } else {
+                    return
+                }
+            }
+
+            val minX = chunks.minOf { it.getLeft() }.toDouble()
+            val minY = chunks.minOf { it.getTop() }.toDouble()
+            val maxX = chunks.maxOf { it.getRight() }.toDouble()
+            val maxY = chunks.maxOf { it.getBottom() }.toDouble()
+
+            val tess = Tessellator.getInstance()
+            val wr = tess.worldRenderer
+
+            matrixStack.push()
+            GL11.glColor3f(1f, 0f, 0f)
+            wr.begin(GL11.GL_LINE_STRIP, DefaultVertexFormats.POSITION)
+            wr.pos(minX, minY, 0.0).endVertex()
+            wr.pos(minX, maxY, 0.0).endVertex()
+            wr.pos(maxX, maxY, 0.0).endVertex()
+            wr.pos(maxX, minY, 0.0).endVertex()
+            wr.pos(minX, minY, 0.0).endVertex()
+            tess.draw()
+            matrixStack.pop()
         }
     }
 
@@ -301,28 +358,30 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
 
         val minX = provider.getChunks().minOf { it.xPosition }
         val minZ = provider.getChunks().minOf { it.zPosition }
+        val boundX = min(minX, provider.getCachedChunks().minOfOrNull { it.xPosition } ?: minX)
+        val boundZ = min(minZ, provider.getCachedChunks().minOfOrNull { it.zPosition } ?: minZ)
         val maxX = provider.getChunks().maxOf { it.xPosition } + 1
         val maxZ = provider.getChunks().maxOf { it.zPosition } + 1
         for (chunk in provider.getChunks()) {
             ChunkComponent(chunk).constrain {
-                this.x = ((chunk.xPosition - minX) * 16).pixels
-                this.y = ((chunk.zPosition - minZ) * 16).pixels
+                this.x = ((chunk.xPosition - boundX) * 16).pixels
+                this.y = ((chunk.zPosition - boundZ) * 16).pixels
                 this.width = 16.pixels
                 this.height = 16.pixels
             } childOf chunkHolder
         }
         for (chunk in provider.getCachedChunks()) {
             ChunkComponent(chunk, true).constrain {
-                this.x = ((chunk.xPosition - minX) * 16).pixels
-                this.y = ((chunk.zPosition - minZ) * 16).pixels
+                this.x = ((chunk.xPosition - boundX) * 16).pixels
+                this.y = ((chunk.zPosition - boundZ) * 16).pixels
                 this.width = 16.pixels
                 this.height = 16.pixels
             } childOf chunkHolder
         }
 
         chunkHolder.constrain {
-            this.x = 50.percent - ((maxX - minX) * 8).pixels
-            this.y = 50.percent - ((maxZ - minZ) * 8).pixels
+            this.x = 50.percent - ((maxX + minX - 2 * boundX) * 8).pixels
+            this.y = 50.percent - ((maxZ + minZ - 2 * boundZ) * 8).pixels
         }
     }
 
@@ -334,8 +393,10 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
             this.state.onSetValue {
                 if (it) {
                     chunks.add(chunk)
+                    empty = false
                 } else {
                     chunks.remove(chunk)
+                    empty = chunks.isEmpty()
                 }
             }
         }

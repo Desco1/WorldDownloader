@@ -2,26 +2,22 @@ package dev.desco.worlddownloader.downloads
 
 import dev.desco.worlddownloader.WorldDownloader
 import dev.desco.worlddownloader.core.configs.impl.SchematicSettings
-import dev.desco.worlddownloader.mixins.NBTBaseAccessor
+import dev.desco.worlddownloader.mixins.accessors.NBTBaseAccessor
 import kotlinx.coroutines.launch
 import net.minecraft.block.Block
 import net.minecraft.client.Minecraft
-import net.minecraft.nbt.CompressedStreamTools
-import net.minecraft.nbt.NBTBase
 import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.nbt.NBTTagDouble
 import net.minecraft.nbt.NBTTagList
 import net.minecraft.util.ChatComponentText
 import net.minecraft.util.EnumChatFormatting
-import net.minecraft.util.MathHelper
 import net.minecraft.world.chunk.Chunk
 import java.io.BufferedOutputStream
-import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.zip.GZIPOutputStream
-import kotlin.math.floor
 
 class SchematicDownloader(private val settings: SchematicSettings): Downloader {
     override val dir = File("schematics").also { if (!it.exists()) it.mkdir() }
@@ -45,8 +41,7 @@ class SchematicDownloader(private val settings: SchematicSettings): Downloader {
             val blockMeta = ByteArray((maxX - minX + 1) * (maxY - minY + 1) * (maxX - minX + 1)) { -1 }
             val addBlocks = ByteArray((maxX - minX) * (maxY - minY) * (maxX - minX) / 2)
 
-            chunks.first().let { println("${it.xPosition}, ${it.zPosition}") }
-
+            // Block section
             for (y in minY until maxY) {
                 for (z in minZ until maxZ) {
                     for (x in minX until maxX) {
@@ -69,10 +64,54 @@ class SchematicDownloader(private val settings: SchematicSettings): Downloader {
 
             nbt.setByteArray("Blocks", byteArray)
             nbt.setByteArray("Data", blockMeta)
-
 /*            if (addBlocks.isNotEmpty()) {
                 nbt.setByteArray("AddBlocks", addBlocks)
             }*/
+
+            // Entity section
+            val entityList = NBTTagList()
+            if (settings.entities) {
+                for (chunk in chunks) {
+                    for (list in chunk.entityLists) {
+                        for (entity in list) {
+                            val entityTag = NBTTagCompound()
+
+                            if (entity.writeToNBTOptional(entityTag)) {
+                                entityList.appendTag(entityTag.apply {
+                                    entityTag.getTagList("Pos", 6).apply {
+                                        this.set(0, NBTTagDouble(this.getDoubleAt(0) - minX))
+                                        this.set(1, NBTTagDouble(this.getDoubleAt(1) - minY))
+                                        this.set(2, NBTTagDouble(this.getDoubleAt(2) - minZ))
+                                    }
+
+                                    if (settings.setVisible) {
+                                        if (this.hasKey("Invisible")) { // For Armor Stands
+                                            this.setBoolean("Invisible", false)
+                                        }
+                                        if (this.hasKey("ActiveEffects")) { // For everyone else
+                                            val potions = this.getTagList("ActiveEffects", 10)
+                                            for (i in 0 until potions.tagCount()) {
+                                                val effect = potions.getCompoundTagAt(i)
+                                                if (effect.getInteger("Id") == 14) {
+                                                    potions.removeTag(i)
+                                                    break
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (settings.invulnerable) {
+                                        this.setBoolean("Invulnerable", true)
+                                    }
+                                    if (settings.silent) {
+                                        this.setBoolean("Silent", true)
+                                    }
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+            nbt.setTag("Entities", entityList)
 
             nbt.setTag("TileEntities", NBTTagList())
 
