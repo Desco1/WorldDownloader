@@ -1,10 +1,9 @@
 package dev.desco.worlddownloader.core
 
-import dev.desco.worlddownloader.core.configs.impl.SaveSettings
+import dev.desco.worlddownloader.core.configs.impl.WorldSettings
 import dev.desco.worlddownloader.core.configs.impl.SchematicSettings
-import dev.desco.worlddownloader.downloads.Downloader
-import dev.desco.worlddownloader.downloads.SaveDownloader
 import dev.desco.worlddownloader.downloads.SchematicDownloader
+import dev.desco.worlddownloader.downloads.WorldDownloader
 import gg.essential.api.EssentialAPI
 import gg.essential.elementa.ElementaVersion
 import gg.essential.elementa.WindowScreen
@@ -20,11 +19,10 @@ import gg.essential.elementa.state.toConstraint
 import gg.essential.elementa.state.zip
 import gg.essential.vigilance.utils.onLeftClick
 import java.awt.Color
-import kotlin.coroutines.coroutineContext
 
-class SettingScreen(val worldScreen: WorldScreen): WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
+class SettingScreen(private val worldScreen: WorldScreen): WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
 
-    private val saveSettings = SaveSettings()
+    private val worldSettings = WorldSettings()
     private val schematicSettings = SchematicSettings()
 
     private val toolbar = UIContainer().constrain {
@@ -66,13 +64,20 @@ class SettingScreen(val worldScreen: WorldScreen): WindowScreen(ElementaVersion.
         onMouseLeave {
             this@apply.setText("Save as...")
         }
+        onLeftClick {
+            when (downloader) {
+                DownloaderType.WORLD -> WorldDownloader(worldSettings)
+                DownloaderType.SCHEMATIC -> SchematicDownloader(schematicSettings)
+            }.saveChunks(worldScreen.chunks)
+            // todo this could use better UI but eh
+        }
     } childOf toolbar
 
     var downloader by state(DownloaderType.SCHEMATIC).apply {
         state.onSetValue {
             container.clearChildren()
             when (it) {
-                DownloaderType.SAVE -> saveSettings
+                DownloaderType.WORLD -> worldSettings
                 DownloaderType.SCHEMATIC -> schematicSettings
             } childOf container
         }
@@ -130,11 +135,11 @@ class SettingScreen(val worldScreen: WorldScreen): WindowScreen(ElementaVersion.
     } childOf window
 
     init {
-        downloader = DownloaderType.SAVE
+        downloader = DownloaderType.WORLD
     }
 
     enum class DownloaderType {
-        SAVE,
+        WORLD,
         SCHEMATIC,;
     }
 }

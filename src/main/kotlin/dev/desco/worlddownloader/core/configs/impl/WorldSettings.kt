@@ -2,7 +2,7 @@ package dev.desco.worlddownloader.core.configs.impl
 
 import dev.desco.worlddownloader.core.configs.Configuration
 
-class SaveSettings: Configuration() {
+class WorldSettings: Configuration() {
 
     private val general = category("World")
     val scoreboard by setting("Save Scoreboard", false)

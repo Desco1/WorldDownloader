@@ -1,10 +1,9 @@
 package dev.desco.worlddownloader.downloads
 
 import dev.desco.worlddownloader.WorldDownloader
-import dev.desco.worlddownloader.core.configs.impl.SaveSettings
+import dev.desco.worlddownloader.core.configs.impl.WorldSettings
 import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
-import net.minecraft.client.entity.EntityOtherPlayerMP
 import net.minecraft.nbt.CompressedStreamTools
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraft.nbt.NBTTagList
@@ -13,13 +12,12 @@ import net.minecraft.util.ChatComponentText
 import net.minecraft.util.EnumChatFormatting
 import net.minecraft.world.chunk.Chunk
 import net.minecraft.world.chunk.NibbleArray
-import net.minecraft.world.chunk.storage.AnvilChunkLoader
 import net.minecraft.world.chunk.storage.RegionFile
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
-class SaveDownloader(private val settings: SaveSettings): Downloader {
+class WorldDownloader(private val settings: WorldSettings): Downloader {
 
     private val world = Minecraft.getMinecraft().theWorld
     private val player = Minecraft.getMinecraft().thePlayer
@@ -42,7 +40,7 @@ class SaveDownloader(private val settings: SaveSettings): Downloader {
                 val level = NBTTagCompound()
                 root.setTag("Level", level)
 
-                // Copy pasted from AnvilChunkLoader, refactored a bit for readability
+                // Copied and pasted from AnvilChunkLoader, refactored a bit for readability
                 level.setByte("V", 1.toByte())
                 level.setInteger("xPos", it.xPosition)
                 level.setInteger("zPos", it.zPosition)

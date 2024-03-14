@@ -5,10 +5,13 @@ import dev.desco.worlddownloader.core.configs.impl.SchematicSettings
 import dev.desco.worlddownloader.mixins.NBTBaseAccessor
 import kotlinx.coroutines.launch
 import net.minecraft.block.Block
+import net.minecraft.client.Minecraft
 import net.minecraft.nbt.CompressedStreamTools
 import net.minecraft.nbt.NBTBase
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraft.nbt.NBTTagList
+import net.minecraft.util.ChatComponentText
+import net.minecraft.util.EnumChatFormatting
 import net.minecraft.util.MathHelper
 import net.minecraft.world.chunk.Chunk
 import java.io.BufferedOutputStream
@@ -79,6 +82,10 @@ class SchematicDownloader(private val settings: SchematicSettings): Downloader {
                 // Yet another excellent Mojang gambit
                 (nbt as NBTBaseAccessor).invokeWrite(it)
             }
+
+            Minecraft.getMinecraft().thePlayer.addChatMessage(ChatComponentText(
+                "${EnumChatFormatting.GREEN}Chunks have been downloaded."
+            ))
         }
     }
 
