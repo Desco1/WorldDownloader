@@ -47,11 +47,7 @@ class SchematicDownloader(private val settings: SchematicSettings): Downloader {
             for (y in minY until maxY) {
                 for (z in minZ until maxZ) {
                     for (x in minX until maxX) {
-                        val chunk = chunks.find { it.xPosition == x shr 4 && it.zPosition == z shr 4  } ?: run {
-                            println("$x, $z")
-                            println("${x shr 4}, ${z shr 4}")
-                            return@launch
-                        }
+                        val chunk = chunks.find { it.xPosition == x shr 4 && it.zPosition == z shr 4  } ?: continue
                         chunk.blockStorageArray?.get(y shr 4)?.let {
                             val i = x.mod(16)
                             val j = y.mod(16)

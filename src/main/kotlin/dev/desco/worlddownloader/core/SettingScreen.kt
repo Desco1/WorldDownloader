@@ -2,14 +2,12 @@ package dev.desco.worlddownloader.core
 
 import dev.desco.worlddownloader.core.configs.impl.SaveSettings
 import dev.desco.worlddownloader.core.configs.impl.SchematicSettings
-import dev.desco.worlddownloader.core.configs.impl.StructureSettings
 import dev.desco.worlddownloader.downloads.Downloader
 import dev.desco.worlddownloader.downloads.SaveDownloader
 import dev.desco.worlddownloader.downloads.SchematicDownloader
-import dev.desco.worlddownloader.downloads.StructureDownloader
+import gg.essential.api.EssentialAPI
 import gg.essential.elementa.ElementaVersion
 import gg.essential.elementa.WindowScreen
-import gg.essential.elementa.components.ScrollComponent
 import gg.essential.elementa.components.UIBlock
 import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.components.UIText
@@ -18,45 +16,57 @@ import gg.essential.elementa.dsl.*
 import gg.essential.elementa.effects.OutlineEffect
 import gg.essential.elementa.state.map
 import gg.essential.elementa.state.state
+import gg.essential.elementa.state.toConstraint
+import gg.essential.elementa.state.zip
 import gg.essential.vigilance.utils.onLeftClick
 import java.awt.Color
-import kotlin.math.abs
-import kotlin.reflect.KProperty
+import kotlin.coroutines.coroutineContext
 
 class SettingScreen(val worldScreen: WorldScreen): WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
 
     private val saveSettings = SaveSettings()
     private val schematicSettings = SchematicSettings()
-    private val structureSettings = StructureSettings()
 
     private val toolbar = UIContainer().constrain {
         this.x = 0.percent
         this.y = 0.percent
-        this.width = 15.percent
-        this.height = 100.percent
-    } effect OutlineEffect(Color.WHITE, 1f, sides = setOf(OutlineEffect.Side.Right)) childOf window
+        this.width = 100.percent
+        this.height = 5.percent
+    } effect OutlineEffect(Color.WHITE, 1f, sides = setOf(OutlineEffect.Side.Bottom)) childOf window
 
-    private val typeBlock = UIContainer().constrain {
-        this.x = CenterConstraint()
-        this.y = 5.pixels
-        this.width = 95.percent
-        this.height = ChildBasedSizeConstraint(2f)
-    } childOf toolbar
-
-    private val previous = UIText("<-").constrain {
-        this.x = 5.pixels
+    private val goBack = UIText("Back").constrain {
+        this.x = 1.5.percent
         this.y = CenterConstraint()
     }.apply {
         onMouseEnter {
-            effect(OutlineEffect(Color.WHITE, 1f))
+            this@apply.setText("§nBack")
         }
         onMouseLeave {
-            removeEffect<OutlineEffect>()
+            this@apply.setText("Back")
         }
         onLeftClick {
-            downloader = DownloaderType.entries[if (downloader.ordinal == 0) DownloaderType.entries.size - 1 else (downloader.ordinal - 1) % DownloaderType.entries.size]
+            EssentialAPI.getGuiUtil().openScreen(worldScreen)
         }
-    } childOf typeBlock
+    }  childOf toolbar
+
+    private val divider = UIBlock(Color.WHITE).constrain {
+        this.x = SiblingConstraint() + 1.5.percent
+        this.y = 0.pixels
+        this.width = 1.pixels
+        this.height = 100.percent
+    } childOf toolbar
+
+    private val saveButton = UIText("Save as...").constrain {
+        this.x = SiblingConstraint() + 1.5.percent
+        this.y = CenterConstraint()
+    }.apply {
+        onMouseEnter {
+            this@apply.setText("§nSave as...")
+        }
+        onMouseLeave {
+            this@apply.setText("Save as...")
+        }
+    } childOf toolbar
 
     var downloader by state(DownloaderType.SCHEMATIC).apply {
         state.onSetValue {
@@ -64,52 +74,59 @@ class SettingScreen(val worldScreen: WorldScreen): WindowScreen(ElementaVersion.
             when (it) {
                 DownloaderType.SAVE -> saveSettings
                 DownloaderType.SCHEMATIC -> schematicSettings
-                DownloaderType.STRUCTURE -> structureSettings
             } childOf container
-            typeText.setText(it.name)
         }
     }
 
-    private val typeText: UIText = UIText("").constrain {
-        this.x = CenterConstraint()
-        this.y = CenterConstraint()
-    }.apply {
-        onMouseEnter {
-            effect(OutlineEffect(Color.WHITE, 1f))
+    init {
+        for (type in DownloaderType.entries) {
+            TypeComponent(type).constrain {
+                this.x = SiblingConstraint(10f)
+                this.y = CenterConstraint()
+            } childOf toolbar
         }
-        onMouseLeave {
-            removeEffect<OutlineEffect>()
-        }
-        onLeftClick {
-            when (downloader) {
-                DownloaderType.SAVE -> SaveDownloader(saveSettings)
-                DownloaderType.SCHEMATIC -> SchematicDownloader(schematicSettings)
-                DownloaderType.STRUCTURE -> StructureDownloader(structureSettings)
-                else -> TODO()
-            }.saveChunks(worldScreen.chunks)
-        }
-    } childOf typeBlock
+    }
 
-    private val next = UIText("->").constrain {
-        this.x = 5.pixels(true)
-        this.y = CenterConstraint()
-    }.apply {
-        onMouseEnter {
-            effect(OutlineEffect(Color.WHITE, 1f))
+    inner class TypeComponent(val type: DownloaderType): UIText() {
+        private var hovered: Boolean by state(false)
+        private val selected: Boolean by map(::downloader) { it == type }
+
+        private val state by zip(::hovered, ::selected)
+
+        init {
+            onLeftClick {
+                downloader = type
+            }
+            onMouseEnter {
+                hovered = true
+            }
+            onMouseLeave {
+                hovered = false
+            }
+
+            bindText(map(::state) { (hovered, selected) ->
+                if (hovered || selected) {
+                    type.name.uppercase()
+                } else {
+                    type.name.lowercase()
+                }
+            }.state)
+
+            setColor(map<Pair<Boolean, Boolean>, Color>(::state) { (hovered, selected) ->
+                if (hovered || selected) {
+                    Color.WHITE
+                } else {
+                    Color.GRAY
+                }
+            }.state.toConstraint())
         }
-        onMouseLeave {
-            removeEffect<OutlineEffect>()
-        }
-        onLeftClick {
-            downloader = DownloaderType.entries[(downloader.ordinal + 1).mod(DownloaderType.entries.size)]
-        }
-    } childOf typeBlock
+    }
 
     private val container = UIContainer().constrain {
-        this.x = 15.percent
-        this.y = 0.percent
-        this.width = 85.percent
-        this.height = 100.percent
+        this.x = 0.percent
+        this.y = 5.percent
+        this.width = 100.percent
+        this.height = 95.percent
     } childOf window
 
     init {
@@ -118,7 +135,6 @@ class SettingScreen(val worldScreen: WorldScreen): WindowScreen(ElementaVersion.
 
     enum class DownloaderType {
         SAVE,
-        SCHEMATIC,
-        STRUCTURE,;
+        SCHEMATIC,;
     }
 }
