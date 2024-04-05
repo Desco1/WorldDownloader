@@ -5,7 +5,6 @@
     "package": "dev.desco.worlddownloader.mixins",
     "refmap": "worlddownloader.mixins.refmap.json",
     "mixins": [
-        "accessors.AnvilChunkLoaderAccessor",
         "accessors.NBTBaseAccessor",
         "ChunkProviderClientMixin",
         "EnumChatFormattingMixin",

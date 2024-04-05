@@ -58,7 +58,7 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
         this.color = Color(170, 170, 170, 170).toConstraint()
     } childOf toolbar
 
-    private val select = UIImage.ofResource("/select-icon.png").constrain {
+    private val select = UIImage.ofResource("/icons/select-icon.png").constrain {
         this.x = 10.pixels
         this.y = CenterConstraint()
         this.width = AspectConstraint()
@@ -84,7 +84,7 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
         }
     }
 
-    private val move = UIImage.ofResource("/move-icon.png").constrain {
+    private val move = UIImage.ofResource("/icons/move-icon.png").constrain {
         this.x = SiblingConstraint(5f).apply { this.constrainTo = select }
         this.y = CenterConstraint()
         this.width = AspectConstraint()
@@ -110,7 +110,7 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
         }
     }
 
-    private val area = UIImage.ofResource("/area-icon.png").constrain {
+    private val area = UIImage.ofResource("/icons/area-icon.png").constrain {
         this.x = SiblingConstraint(5f).apply { this.constrainTo = move }
         this.y = CenterConstraint()
         this.width = AspectConstraint()
@@ -143,7 +143,7 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
         this.height = 70.percent
     } childOf toolbar
 
-    private val toggleCache = UIImage.ofResource("/cache-icon.png").constrain {
+    private val toggleCache = UIImage.ofResource("/icons/cache-icon.png").constrain {
         this.x = SiblingConstraint(5f).apply { this.constrainTo = divider }
         this.y = CenterConstraint()
         this.width = AspectConstraint()
@@ -189,7 +189,7 @@ class WorldScreen: WindowScreen(ElementaVersion.V1, newGuiScale = 2) {
         }
     }
 
-    private val download = UIImage.ofResource("/download-icon.png").constrain {
+    private val download = UIImage.ofResource("/icons/download-icon.png").constrain {
         this.x = SiblingConstraint(5f).apply { this.constrainTo = toggleCache }
         this.y = CenterConstraint()
         this.width = AspectConstraint()

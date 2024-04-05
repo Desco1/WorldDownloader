@@ -9,5 +9,5 @@ import java.io.DataOutput;
 @Mixin(NBTBase.class)
 public interface NBTBaseAccessor {
 
-    @Invoker abstract void invokeWrite(DataOutput output);
+    @Invoker void invokeWrite(DataOutput output);
 }
