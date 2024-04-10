@@ -4,7 +4,6 @@ import dev.desco.worlddownloader.core.WorldScreen
 import gg.essential.api.EssentialAPI
 import gg.essential.api.commands.Command
 import gg.essential.api.commands.DefaultHandler
-import net.minecraft.client.Minecraft
 
 object WorldDownloadCommand: Command("wdl") {
 

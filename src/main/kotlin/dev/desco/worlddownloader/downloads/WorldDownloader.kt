@@ -26,153 +26,160 @@ class WorldDownloader(private val settings: WorldSettings): Downloader {
 
     override fun saveChunks(chunks: Set<Chunk>) {
         WorldDownloader.launch {
-            val name = format.format(Date())
-            val save = dir.resolve(name).also { if (!it.exists()) it.mkdir() }
-            val regions = hashMapOf<Pair<Int, Int>, RegionFile>()
-            chunks.forEach {
-                val region = regions.computeIfAbsent(it.xPosition shr 5 to (it.zPosition shr 5)) { (x, z) ->
-                    RegionFile(save.resolve("region").also { if (!it.exists()) it.mkdir() }.resolve("r.$x.$z.mca"))
-                }
+            runCatching {
+                val name = format.format(Date())
+                val save = dir.resolve(name).also { if (!it.exists()) it.mkdir() }
+                val regions = hashMapOf<Pair<Int, Int>, RegionFile>()
+                chunks.forEach {
+                    val region = regions.computeIfAbsent(it.xPosition shr 5 to (it.zPosition shr 5)) { (x, z) ->
+                        RegionFile(save.resolve("region").also { if (!it.exists()) it.mkdir() }.resolve("r.$x.$z.mca"))
+                    }
 
-                val chunkIndex = (it.xPosition and 31) + (it.zPosition and 31) * 32
-                val stream = region.getChunkDataOutputStream(chunkIndex % 32, chunkIndex / 32)
-                val root = NBTTagCompound()
-                val level = NBTTagCompound()
-                root.setTag("Level", level)
+                    val chunkIndex = (it.xPosition and 31) + (it.zPosition and 31) * 32
+                    val stream = region.getChunkDataOutputStream(chunkIndex % 32, chunkIndex / 32)
+                    val root = NBTTagCompound()
+                    val level = NBTTagCompound()
+                    root.setTag("Level", level)
 
-                // Copied and pasted from AnvilChunkLoader, refactored a bit for readability
-                level.setByte("V", 1.toByte())
-                level.setInteger("xPos", it.xPosition)
-                level.setInteger("zPos", it.zPosition)
-                level.setLong("LastUpdate", world.totalWorldTime)
-                level.setIntArray("HeightMap", it.heightMap)
-                level.setBoolean("TerrainPopulated", it.isTerrainPopulated)
-                level.setBoolean("LightPopulated", it.isLightPopulated)
-                level.setLong("InhabitedTime", it.inhabitedTime)
+                    // Copied and pasted from AnvilChunkLoader, refactored a bit for readability
+                    level.setByte("V", 1.toByte())
+                    level.setInteger("xPos", it.xPosition)
+                    level.setInteger("zPos", it.zPosition)
+                    level.setLong("LastUpdate", world.totalWorldTime)
+                    level.setIntArray("HeightMap", it.heightMap)
+                    level.setBoolean("TerrainPopulated", it.isTerrainPopulated)
+                    level.setBoolean("LightPopulated", it.isLightPopulated)
+                    level.setLong("InhabitedTime", it.inhabitedTime)
 
-                // Block section
-                val blocks = it.blockStorageArray
-                val blockList = NBTTagList()
-                val flag = !world.provider.hasNoSky
-                for (blockStorage in blocks) {
-                    if (blockStorage != null) {
-                        val nbt = NBTTagCompound()
-                        nbt.setByte("Y", (blockStorage.yLocation shr 4 and 255).toByte())
-                        val byteArray = ByteArray(blockStorage.data.size)
-                        val blockData = NibbleArray()
-                        val blockMeta = NibbleArray()
+                    // Block section
+                    val blocks = it.blockStorageArray
+                    val blockList = NBTTagList()
+                    val flag = !world.provider.hasNoSky
+                    for (blockStorage in blocks) {
+                        if (blockStorage != null) {
+                            val nbt = NBTTagCompound()
+                            nbt.setByte("Y", (blockStorage.yLocation shr 4 and 255).toByte())
+                            val byteArray = ByteArray(blockStorage.data.size)
+                            val blockData = NibbleArray()
+                            val blockMeta = NibbleArray()
 
-                        for (i in blockStorage.data.indices) {
-                            val c0 = blockStorage.data[i]
-                            val j = i and 15
-                            val k = i shr 8 and 15
-                            val l = i shr 4 and 15
+                            for (i in blockStorage.data.indices) {
+                                val c0 = blockStorage.data[i]
+                                val j = i and 15
+                                val k = i shr 8 and 15
+                                val l = i shr 4 and 15
 
-                            if (c0.code shr 12 != 0) {
-                                blockMeta[j, k, l] = c0.code shr 12
+                                if (c0.code shr 12 != 0) {
+                                    blockMeta[j, k, l] = c0.code shr 12
+                                }
+
+                                byteArray[i] = (c0.code shr 4 and 255).toByte()
+                                blockData[j, k, l] = c0.code and 15
                             }
 
-                            byteArray[i] = (c0.code shr 4 and 255).toByte()
-                            blockData[j, k, l] = c0.code and 15
+                            nbt.setByteArray("Blocks", byteArray)
+                            nbt.setByteArray("Data", blockData.data)
+
+                            if (blockMeta.data.isNotEmpty()) {
+                                nbt.setByteArray("Add", blockMeta.data)
+                            }
+
+                            nbt.setByteArray("BlockLight", blockStorage.blocklightArray.data)
+
+                            if (flag) {
+                                nbt.setByteArray("SkyLight", blockStorage.skylightArray.data)
+                            } else {
+                                nbt.setByteArray(
+                                    "SkyLight",
+                                    ByteArray(blockStorage.blocklightArray.data.size)
+                                )
+                            }
+
+                            blockList.appendTag(nbt)
                         }
-
-                        nbt.setByteArray("Blocks", byteArray)
-                        nbt.setByteArray("Data", blockData.data)
-
-                        if (blockMeta.data.isNotEmpty()) {
-                            nbt.setByteArray("Add", blockMeta.data)
-                        }
-
-                        nbt.setByteArray("BlockLight", blockStorage.blocklightArray.data)
-
-                        if (flag) {
-                            nbt.setByteArray("SkyLight", blockStorage.skylightArray.data)
-                        } else {
-                            nbt.setByteArray(
-                                "SkyLight",
-                                ByteArray(blockStorage.blocklightArray.data.size)
-                            )
-                        }
-
-                        blockList.appendTag(nbt)
                     }
-                }
-                level.setTag("Sections", blockList)
+                    level.setTag("Sections", blockList)
 
-                level.setByteArray("Biomes", it.biomeArray)
+                    level.setByteArray("Biomes", it.biomeArray)
 
-                // Entity section
-                it.setHasEntities(false)
-                val entityList = NBTTagList()
-                if (settings.entities) {
-                    for (list in it.entityLists) {
-                        for (entity in list) {
-                            val entityTag = NBTTagCompound()
+                    // Entity section
+                    it.setHasEntities(false)
+                    val entityList = NBTTagList()
+                    if (settings.entities) {
+                        for (list in it.entityLists) {
+                            for (entity in list) {
+                                val entityTag = NBTTagCompound()
 
-                            if (entity.writeToNBTOptional(entityTag)) {
-                                it.setHasEntities(true)
-                                entityList.appendTag(entityTag.apply {
-                                    if (settings.setVisible) {
-                                        if (this.hasKey("Invisible")) { // For Armor Stands
-                                            this.setBoolean("Invisible", false)
-                                        }
-                                        if (this.hasKey("ActiveEffects")) { // For everyone else
-                                            val potions = this.getTagList("ActiveEffects", 10)
-                                            for (i in 0 until potions.tagCount()) {
-                                                val effect = potions.getCompoundTagAt(i)
-                                                if (effect.getInteger("Id") == 14) {
-                                                    potions.removeTag(i)
-                                                    break
+                                if (entity.writeToNBTOptional(entityTag)) {
+                                    it.setHasEntities(true)
+                                    entityList.appendTag(entityTag.apply {
+                                        if (settings.setVisible) {
+                                            if (this.hasKey("Invisible")) { // For Armor Stands
+                                                this.setBoolean("Invisible", false)
+                                            }
+                                            if (this.hasKey("ActiveEffects")) { // For everyone else
+                                                val potions = this.getTagList("ActiveEffects", 10)
+                                                for (i in 0 until potions.tagCount()) {
+                                                    val effect = potions.getCompoundTagAt(i)
+                                                    if (effect.getInteger("Id") == 14) {
+                                                        potions.removeTag(i)
+                                                        break
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                    if (settings.invulnerable) {
-                                        this.setBoolean("Invulnerable", true)
-                                    }
-                                    if (settings.silent) {
-                                        this.setBoolean("Silent", true)
-                                    }
-                                })
+                                        if (settings.invulnerable) {
+                                            this.setBoolean("Invulnerable", true)
+                                        }
+                                        if (settings.silent) {
+                                            this.setBoolean("Silent", true)
+                                        }
+                                    })
+                                }
                             }
                         }
                     }
+                    level.setTag("Entities", entityList)
+
+                    // Tile entity section
+                    val tileEntityList = NBTTagList()
+                    for (tileEntity in it.tileEntityMap.values) {
+                        val tileEntityTag = NBTTagCompound()
+                        tileEntity.writeToNBT(tileEntityTag)
+                        tileEntityList.appendTag(tileEntityTag)
+                    }
+                    level.setTag("TileEntities", tileEntityList)
+
+                    CompressedStreamTools.write(root, stream)
+                    stream.close()
                 }
-                level.setTag("Entities", entityList)
+                regions.values.forEach { it.close() }
 
-                // Tile entity section
-                val tileEntityList = NBTTagList()
-                for (tileEntity in it.tileEntityMap.values) {
-                    val tileEntityTag = NBTTagCompound()
-                    tileEntity.writeToNBT(tileEntityTag)
-                    tileEntityList.appendTag(tileEntityTag)
+                // Level.dat
+                save.resolve("level.dat").outputStream().use {
+                    CompressedStreamTools.writeCompressed(newLevelDat(name), it)
                 }
-                level.setTag("TileEntities", tileEntityList)
 
-                CompressedStreamTools.write(root, stream)
-                stream.close()
-            }
-            regions.values.forEach { it.close() }
-
-            // Level.dat
-            save.resolve("level.dat").outputStream().use {
-                CompressedStreamTools.writeCompressed(newLevelDat(name), it)
-            }
-
-            // Scoreboard.dat
-            if (settings.scoreboard && world.scoreboard != null) {
-                save.resolve("data").also { it.mkdir() }.resolve("scoreboard.dat").outputStream().use {
-                    val scoreboard = NBTTagCompound()
-                    ScoreboardSaveData().apply { setScoreboard(world.scoreboard) }.writeToNBT(scoreboard)
-                    val nbt = NBTTagCompound()
-                    nbt.setTag("data", scoreboard)
-                    CompressedStreamTools.writeCompressed(nbt, it)
+                // Scoreboard.dat
+                if (settings.scoreboard && world.scoreboard != null) {
+                    save.resolve("data").also { it.mkdir() }.resolve("scoreboard.dat").outputStream().use {
+                        val scoreboard = NBTTagCompound()
+                        ScoreboardSaveData().apply { setScoreboard(world.scoreboard) }.writeToNBT(scoreboard)
+                        val nbt = NBTTagCompound()
+                        nbt.setTag("data", scoreboard)
+                        CompressedStreamTools.writeCompressed(nbt, it)
+                    }
                 }
+            }.onFailure {
+                Minecraft.getMinecraft().thePlayer.addChatMessage(ChatComponentText(
+                    "${EnumChatFormatting.RED}Something went wrong trying to download chunks. Logs may include useful information."
+                ))
+                it.printStackTrace()
+            }.onSuccess {
+                Minecraft.getMinecraft().thePlayer.addChatMessage(ChatComponentText(
+                    "${EnumChatFormatting.GREEN}Chunks have been downloaded."
+                ))
             }
-
-            Minecraft.getMinecraft().thePlayer.addChatMessage(ChatComponentText(
-                "${EnumChatFormatting.GREEN}Chunks have been downloaded."
-            ))
         }
     }
 

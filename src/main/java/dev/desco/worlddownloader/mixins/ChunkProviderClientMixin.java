@@ -1,12 +1,9 @@
 package dev.desco.worlddownloader.mixins;
 
-import com.google.common.collect.Lists;
 import dev.desco.worlddownloader.utils.ChunkProviderCache;
 import net.minecraft.client.multiplayer.ChunkProviderClient;
 import net.minecraft.util.BlockPos;
-import net.minecraft.util.LongHashMap;
 import net.minecraft.world.ChunkCoordIntPair;
-import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Mixin;
@@ -21,7 +18,6 @@ import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
 
 @Mixin(ChunkProviderClient.class)
 public class ChunkProviderClientMixin implements ChunkProviderCache {

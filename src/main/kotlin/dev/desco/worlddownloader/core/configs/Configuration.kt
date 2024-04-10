@@ -6,7 +6,6 @@ import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.components.UIText
 import gg.essential.elementa.constraints.*
 import gg.essential.elementa.dsl.*
-import net.minecraft.client.Minecraft
 import java.awt.Color
 
 abstract class Configuration: UIContainer() {
